@@ -5,13 +5,25 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from sklearn.utils import shuffle
+import tensorflow.contrib.slim.nets
+
+"""
+Download the weights trained on ImageNet for VGG:
+
+wget http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz
+tar -xvf vgg_16_2016_08_28.tar.gz
+rm vgg_16_2016_08_28.tar.gz
+
+"""
+
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
 slim = tf.contrib.slim
+finetune = False
 
-
-DATA_DIR = '/home/ubuntu/kelly/fashion_rgb/'
+# DATA_DIR = '/home/ubuntu/kelly/fashion_rgb/'
+DATA_DIR = '/Users/kellywang/Downloads/fashion_rgb/'
 
 class VGG16:
 
@@ -34,7 +46,6 @@ class VGG16:
             net = slim.max_pool2d(net, [2, 2], scope='pool4')
             net = slim.repeat(net, 3, slim.conv2d, 512, [3, 3], scope='conv5')
             net = slim.max_pool2d(net, [2, 2], scope='pool5')
-
             logits = slim.conv2d(net, self.n_classes, [1, 1], scope='fc6')
             logits = tf.squeeze(logits, [1, 2], name='fc6/squeezed')
             predictions = tf.argmax(logits, axis=-1)
@@ -60,8 +71,13 @@ def get_model_fn(features, labels, mode, params):
     """
     # get custom model
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-    model = VGG16(is_training, 46)
-    logits, predictions = model.forward(features)
+    if not finetune:
+        model = VGG16(is_training, 46)
+        logits, predictions = model.forward(features)
+    else:
+        vgg = tf.contrib.slim.nets.vgg
+        logits, _ = vgg.vgg_16(features, num_classes = 46,is_training = is_training)
+        predictions = tf.argmax(logits, axis=-1)
     if mode != tf.estimator.ModeKeys.PREDICT:
         # loss
         loss = tf.losses.sparse_softmax_cross_entropy(
